@@ -2,7 +2,17 @@ import cv2
 import numpy as np
 import json
 
-img = cv2.imread('./images/demo.png',0)
+img = cv2.imread('./images/demo.jpg',0)
+
+# resize img
+height, width = img.shape[:2]
+aspect_ratio = height/width
+new_height = 800
+new_width = new_height/aspect_ratio
+size = (int(new_width), int(new_height))
+img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+
+# preprocess img
 img = cv2.medianBlur(img,5)
 original_img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
 
@@ -11,7 +21,7 @@ circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,param1=60,param2=30,minRa
 circles = np.uint16(np.around(circles))
 
 # set boundaries of users' stroke-color
-boundaries = [([0, 0, 0], [220,220,220])]
+boundaries = [([0, 0, 0], [70, 70, 70])]
 
 # store selected circle position 
 found = []
@@ -19,13 +29,15 @@ found = []
 # store possible circle's pos_x in the sheet
 circle_pos_x = []
 
+# set a threshold of center rect's pixel value
 base_pixel = 200
+
 for item in circles[0,:]:
     # draw the outer circle
     x = item[0] # x pos
     y = item[1] # y pos
     r = item[2] # radius
-    # cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
+    cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
     
     # record possible circle's pos_x in the sheet
     pushed = 0    
@@ -68,8 +80,6 @@ for index,item in enumerate(found):
 # print(circle_pos_x)
 for item in found:
     print("question",item["ques"],":",item["option"])
-
-
 
 cv2.imshow('detected circles',original_img)
 cv2.waitKey(0)
