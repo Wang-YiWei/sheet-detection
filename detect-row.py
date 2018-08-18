@@ -7,7 +7,7 @@ img = cv2.imread('./images/demo.jpg',0)
 # resize img
 height, width = img.shape[:2]
 aspect_ratio = height/width
-new_height = 800
+new_height = 3*297
 new_width = new_height/aspect_ratio
 size = (int(new_width), int(new_height))
 img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
@@ -32,17 +32,19 @@ circle_pos_x = []
 # set a threshold of center rect's pixel value
 base_pixel = 200
 
+min_dist_between_circles = 30
 for item in circles[0,:]:
     # draw the outer circle
     x = item[0] # x pos
     y = item[1] # y pos
     r = item[2] # radius
+    print(item)
     # cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
     
     # record possible circle's pos_x in the sheet
     pushed = 0    
     for j in range(len(circle_pos_x)):
-        if (x <= circle_pos_x[j] + 30 and x >= circle_pos_x[j] - 30):
+        if (x <= circle_pos_x[j] + min_dist_between_circles and x >= circle_pos_x[j] - min_dist_between_circles):
             pushed = 1
     if(not(pushed)):
         circle_pos_x.append(x)
@@ -73,7 +75,7 @@ for index,item in enumerate(found):
     item["ques"] = index + 1
     cv2.circle(original_img,(item["x"],item["y"]),r,(0,0,255),2) # check if circles are correct (removable)
     for index2,value in enumerate(circle_pos_x):
-        if(item["x"] <= value + 30 and item["x"] >= value - 30):
+        if(item["x"] <= value + min_dist_between_circles and item["x"] >= value - min_dist_between_circles):
             item["option"] = index2+1
 # print(found)
 

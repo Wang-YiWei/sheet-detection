@@ -1,12 +1,12 @@
 import cv2
 import numpy as np
 
-img = cv2.imread('./images/demo2.png',0)
+img = cv2.imread('./images/demo2.jpg',0)
 
 # resize img
 height, width = img.shape[:2]
 aspect_ratio = height/width
-new_height = 800
+new_height = 3*297
 new_width = new_height/aspect_ratio
 size = (int(new_width), int(new_height))
 img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
