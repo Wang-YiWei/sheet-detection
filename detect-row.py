@@ -17,7 +17,7 @@ img = cv2.medianBlur(img,5)
 original_img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
 
 # find circles in the sheet
-circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,param1=60,param2=30,minRadius=0,maxRadius=50)
+circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,param1=60,param2=30,minRadius=8,maxRadius=30)
 circles = np.uint16(np.around(circles))
 
 # set boundaries of users' stroke-color
@@ -37,7 +37,7 @@ for item in circles[0,:]:
     x = item[0] # x pos
     y = item[1] # y pos
     r = item[2] # radius
-    cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
+    # cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
     
     # record possible circle's pos_x in the sheet
     pushed = 0    
@@ -81,6 +81,7 @@ for index,item in enumerate(found):
 for item in found:
     print("question",item["ques"],":",item["option"])
 
+# cv2.imwrite('demo.png',original_img)
 cv2.imshow('detected circles',original_img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()

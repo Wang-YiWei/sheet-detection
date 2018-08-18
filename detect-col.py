@@ -1,12 +1,22 @@
 import cv2
 import numpy as np
 
-img = cv2.imread('./images/circle_sheet21.png',0)
+img = cv2.imread('./images/demo2.png',0)
+
+# resize img
+height, width = img.shape[:2]
+aspect_ratio = height/width
+new_height = 800
+new_width = new_height/aspect_ratio
+size = (int(new_width), int(new_height))
+img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+
+# preprocess img
 img = cv2.medianBlur(img,5)
 original_img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
 
 # find circles in the sheet
-circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,param1=60,param2=30,minRadius=0,maxRadius=50)
+circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,param1=60,param2=30,minRadius=8,maxRadius=30)
 circles = np.uint16(np.around(circles))
 
 all_circles_x = []
@@ -19,11 +29,12 @@ value_count = np.bincount(np.array(all_circles_x))
 most_frequent_x = np.argmax(value_count)
 
 # filter the question circle
+ques_and_opt_circle_dist = 10
 ques_circle_y = []
 for item in circles[0,:]:
     x = item[0] # x pos
     y = item[1] # y pos    
-    if(abs(x - most_frequent_x) > 10):
+    if(abs(x - most_frequent_x) > ques_and_opt_circle_dist):
         ques_circle_y.append(y)
 
 # categorize circles among questions
@@ -56,7 +67,9 @@ for current_ques in range(total_ques_num):
             count += 1
 
 # set boundaries of users' stroke-color
-boundaries = [([0, 0, 0], [220,220,220])]
+boundaries = [([0, 0, 0], [70, 70, 70])]
+
+# set a threshold of center rect's pixel value
 base_pixel = 200 
 
 # store selected circle 
