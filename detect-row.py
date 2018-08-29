@@ -2,7 +2,23 @@ import cv2
 import numpy as np
 import json
 
-img = cv2.imread('./images/demo.jpg',0)
+# todo: 判斷找到的圓x、y與其他圓是否有偏差
+    # note: 應該不能把特立獨行的y刪掉，不然如果每題都只有一個選項，每個圓的y都會是特立獨行的
+        # 每題不會只有一個選項...，還是要刪掉特立獨行的y
+    
+# todo: 把判斷黑圓的方法修改成同一列最黑的
+    # ok
+
+# todo？: 把圓從內接正方形變成外接正方形
+    # 原本就是外接
+
+# tofix : 去噪(media blur) 參數
+# tofix : adaptiveThreshold 參數
+# tofix : HoughCircles 參數
+# tofix : boundaries
+# tofix : border
+
+img = cv2.imread('./images/test2.jpg',0)
 
 # resize img
 height, width = img.shape[:2]
@@ -13,77 +29,161 @@ size = (int(new_width), int(new_height))
 img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
 
 # preprocess img
-img = cv2.medianBlur(img,5)
+## remove shadow and strengthen black circle
+strengthen_img = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+    cv2.THRESH_BINARY,21,2)
+img = cv2.medianBlur(img,3)
 original_img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
 
 # find circles in the sheet
 circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,param1=60,param2=30,minRadius=8,maxRadius=30)
-circles = np.uint16(np.around(circles))
+circles = np.uint16(np.ceil(circles))
 
-# set boundaries of users' stroke-color
-boundaries = [([0, 0, 0], [70, 70, 70])]
+# store all circle's posX , posY and radius
+circle_info = []
 
-# store selected circle position 
-found = []
+# store all circle's posX、posY and its showup-count
+posX_counter = []
+posX_offset = 10 # posX's deviation
 
-# store possible circle's pos_x in the sheet
-circle_pos_x = []
+posY_counter = []
+posY_offset = 10 # posY's deviation
 
-# set a threshold of center rect's pixel value
-base_pixel = 200
-
-min_dist_between_circles = 30
+# store circle info and collect possible options' x
 for item in circles[0,:]:
-    # draw the outer circle
     x = item[0] # x pos
     y = item[1] # y pos
     r = item[2] # radius
-    print(item)
-    # cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
     
-    # record possible circle's pos_x in the sheet
-    pushed = 0    
-    for j in range(len(circle_pos_x)):
-        if (x <= circle_pos_x[j] + min_dist_between_circles and x >= circle_pos_x[j] - min_dist_between_circles):
-            pushed = 1
-    if(not(pushed)):
-        circle_pos_x.append(x)
+    info = {'x' : x, 'y' : y, 'radius' : r ,\
+         'ques' : 0 , 'option' : 0 , 'value' : 0}
+    circle_info.append(info)
 
-    # crop circle
+    # record possible circle's posX in the sheet
+    pushed_x = 0 
+    for pos_record in posX_counter:
+        if (x <= pos_record['x'] + posX_offset and \
+            x >= pos_record['x'] - posX_offset):
+            pushed_x = 1
+    if(not(pushed_x)):
+        new_pos = {'x' : x , 'count' : 0}
+        posX_counter.append(new_pos)
+
+    # record possible circle's posY in the sheet
+    pushed_y = 0 
+    for pos_record in posY_counter:
+        if (y <= pos_record['y'] + posY_offset and \
+            y >= pos_record['y'] - posY_offset):
+            pushed_y = 1
+    if(not(pushed_y)):
+        new_pos = {'y' : y , 'count' : 0}
+        posY_counter.append(new_pos)
+
+# collect possible x's and y's showup-count
+for item in circle_info:
+    for pos_record in posX_counter:
+        if (item['x'] <= pos_record['x'] + posX_offset and \
+            item['x'] >= pos_record['x'] - posX_offset):
+            pos_record['count'] += 1
+
+    for pos_record in posY_counter:
+        if (item['y'] <= pos_record['y'] + posY_offset and \
+            item['y'] >= pos_record['y'] - posY_offset):
+            pos_record['count'] += 1
+
+# pop out outstanding option
+for pos_record in posX_counter:
+    if (pos_record['count'] == 1):
+        for item in circle_info:
+            if (item['x'] == pos_record['x']):
+                circle_info.remove(item)
+        posX_counter.remove(pos_record)
+
+for pos_record in posY_counter:
+    if (pos_record['count'] == 1):
+        for item in circle_info:
+            if (item['y'] == pos_record['y']):
+                circle_info.remove(item)
+        posY_counter.remove(pos_record)
+
+# categorize ques num and option num
+## sort in the order of option
+circle_info.sort(key=lambda d:d['x'])
+## sort in the order of question
+circle_info.sort(key=lambda d:d['y'])
+
+posX_counter.sort(key=lambda d:d['x'])
+posY_counter.sort(key=lambda d:d['y'])
+
+
+for index,item in enumerate(circle_info):
+    # categorize ques num
+    for y_index,y_item in enumerate(posY_counter):
+        if(item["y"] <= y_item["y"] + posY_offset and \
+            item["y"] >= y_item["y"] - posY_offset):
+            item["ques"] = y_index+1
+            break
+
+    # categorize option num
+    for x_index,x_item in enumerate(posX_counter):
+        if(item["x"] <= x_item["x"] + posX_offset and \
+            item["x"] >= x_item["x"] - posX_offset):
+            item["option"] = x_index+1
+            break
+            
+
+# print(circle_info) # check if circle info is correct
+
+# start recognition
+# set boundaries of users' stroke-color
+boundaries = [([0], [50])]
+border = 8
+for item in circle_info:
+    x = item['x']
+    y = item['y']
+    r = item['radius']
+    ques = item['ques'] # removable
+    opt = item['option'] # removable
+    
+    cv2.circle(original_img,(x,y),r,(0,255,0),2) # check if circles are correct (removable)
+    
+    # crop circle to external square
     rectX = (x - r)
     rectY = (y - r)
-    crop_img = original_img[rectY:(rectY+2*r), rectX:(rectX+2*r)]
+    crop_img = strengthen_img[rectY+border:(rectY+2*r)-border,\
+                            rectX+border:(rectX+2*r)-border]    
 
     for (lower, upper) in boundaries:
         lower = np.array(lower, dtype = "uint8")
         upper = np.array(upper, dtype = "uint8")
         mask = cv2.inRange(crop_img, lower, upper)
+        # the more pixel , the more 255 value in mask(2-d array)
 
-        # check if the center rect of the circle is filled
-        center_rect = mask[int(0.5*r):int(1.5*r), int(0.5*r):int(1.5*r)]
-        if(np.average(center_rect) >= base_pixel):
-            pos = {"x" : x, "y" : y, "ques" : 0, "option" : 0}
-            found.append(dict(pos))
+        for row in mask:
+            for col in row:
+                if( col == 255):
+                    item['value'] += 1
+    
+    # cv2.imshow('detected circles {},{}'.format(ques,opt),crop_img)
 
-# sort in the order of question
-found.sort(key=lambda d:d["y"])
+# judge answer
+for ques_index in range(len(posY_counter)):
+    blackest = 0
+    ans = 0
+    found = 0 #
+    for item in circle_info:
+        if(item['ques'] == ques_index+1):
+            if(item['value'] > blackest):
+                blackest = item['value']
+                ans = item['option']
+                found = item
 
-# sort in the order of option
-circle_pos_x.sort()
+    cv2.circle(original_img,(found['x'],found['y']),found['radius'],\
+        (0,0,255),2) # check if circles are correct (removable)
+    print("question",ques_index+1,":",ans)
 
-for index,item in enumerate(found):
-    item["ques"] = index + 1
-    cv2.circle(original_img,(item["x"],item["y"]),r,(0,0,255),2) # check if circles are correct (removable)
-    for index2,value in enumerate(circle_pos_x):
-        if(item["x"] <= value + min_dist_between_circles and item["x"] >= value - min_dist_between_circles):
-            item["option"] = index2+1
-# print(found)
+# print(circle_info)
 
-# print(circle_pos_x)
-for item in found:
-    print("question",item["ques"],":",item["option"])
-
-# cv2.imwrite('demo.png',original_img)
 cv2.imshow('detected circles',original_img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
