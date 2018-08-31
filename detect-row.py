@@ -17,8 +17,16 @@ import json
 # tofix : HoughCircles 參數
 # tofix : boundaries
 # tofix : border
+# tofix : 模糊把點拿掉
+# tofix : x y deviation
 
-img = cv2.imread('./images/test2.jpg',0)
+
+# tofix : 
+filename = './images/t4.jpg'
+total_ques_num = 8
+total_opt_num = 5
+
+img = cv2.imread(filename,0)
 
 # resize img
 height, width = img.shape[:2]
@@ -32,7 +40,11 @@ img = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
 ## remove shadow and strengthen black circle
 strengthen_img = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
     cv2.THRESH_BINARY,21,2)
-img = cv2.medianBlur(img,3)
+img = cv2.medianBlur(img,5)
+
+# sobelx = cv2.Sobel(img,cv2.CV_64F,1,0,ksize=13)
+# sobely = cv2.Sobel(img,cv2.CV_64F,0,1,ksize=13)
+# cv2.imshow('sobel',sobely)
 original_img = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
 
 # find circles in the sheet
@@ -44,10 +56,10 @@ circle_info = []
 
 # store all circle's posX、posY and its showup-count
 posX_counter = []
-posX_offset = 10 # posX's deviation
+posX_offset = 30 # posX's deviation
 
 posY_counter = []
-posY_offset = 10 # posY's deviation
+posY_offset = 30 # posY's deviation
 
 # store circle info and collect possible options' x
 for item in circles[0,:]:
@@ -79,6 +91,8 @@ for item in circles[0,:]:
         new_pos = {'y' : y , 'count' : 0}
         posY_counter.append(new_pos)
 
+    # print(r)
+
 # collect possible x's and y's showup-count
 for item in circle_info:
     for pos_record in posX_counter:
@@ -90,6 +104,9 @@ for item in circle_info:
         if (item['y'] <= pos_record['y'] + posY_offset and \
             item['y'] >= pos_record['y'] - posY_offset):
             pos_record['count'] += 1
+
+# print(posX_counter)
+# print(posY_counter)
 
 # pop out outstanding option
 for pos_record in posX_counter:
@@ -138,6 +155,9 @@ for index,item in enumerate(circle_info):
 # set boundaries of users' stroke-color
 boundaries = [([0], [50])]
 border = 8
+
+kernel = np.ones((3,3),np.uint8)
+
 for item in circle_info:
     x = item['x']
     y = item['y']
@@ -153,10 +173,12 @@ for item in circle_info:
     crop_img = strengthen_img[rectY+border:(rectY+2*r)-border,\
                             rectX+border:(rectX+2*r)-border]    
 
+    erosion = cv2.erode(crop_img,kernel,iterations = 1)    
+
     for (lower, upper) in boundaries:
         lower = np.array(lower, dtype = "uint8")
         upper = np.array(upper, dtype = "uint8")
-        mask = cv2.inRange(crop_img, lower, upper)
+        mask = cv2.inRange(erosion, lower, upper)
         # the more pixel , the more 255 value in mask(2-d array)
 
         for row in mask:
@@ -164,26 +186,44 @@ for item in circle_info:
                 if( col == 255):
                     item['value'] += 1
     
-    # cv2.imshow('detected circles {},{}'.format(ques,opt),crop_img)
+    cv2.imshow('detected circles {},{}'.format(ques,opt),erosion)
 
+
+ans_list = []
 # judge answer
 for ques_index in range(len(posY_counter)):
     blackest = 0
     ans = 0
-    found = 0 #
+    found = {} #
     for item in circle_info:
         if(item['ques'] == ques_index+1):
+            # print(item['value'])
             if(item['value'] > blackest):
                 blackest = item['value']
+                ans_list.append(item['option'])
                 ans = item['option']
                 found = item
 
-    cv2.circle(original_img,(found['x'],found['y']),found['radius'],\
-        (0,0,255),2) # check if circles are correct (removable)
-    print("question",ques_index+1,":",ans)
+    # print(len(found)) #
+    # cv2.circle(original_img,(found['x'],found['y']),found['radius'],(0,0,255),2) # check if circles are correct (removable)
+    # print("question",ques_index+1,":",ans)
 
-# print(circle_info)
+
+# check question num and option num is correct
+fail = False
+if(len(ans_list) != total_ques_num):
+    fail = True
+for ans in ans_list:
+    if(ans < 1 or ans > total_opt_num):
+        fail = True
+if(fail):
+    ans_list = []
+
+print(ans_list)
+
 
 cv2.imshow('detected circles',original_img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+
+# return ans_list
