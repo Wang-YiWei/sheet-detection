@@ -22,7 +22,7 @@ import json
 
 
 # tofix : 
-filename = './images/5_8.jpeg'
+filename = './images/t8.jpg'
 total_ques_num = 8
 total_opt_num = 5
 
@@ -228,18 +228,41 @@ def recognize(p1,p2):
 
 
 res = []
-arr = [[0 for i in range(3)] for j in range(4)]
+arr = [[0 for i in range(1)] for j in range(4)]
 for p1 in range(40,80,10):
-    for p2 in range(25, 40, 5):
+    # for p2 in range(25, 40, 5):
+        p2 = 25
         curr_ans = recognize(p1,p2)
         res.append(curr_ans)
         if(curr_ans == [2,3,1,4,5,2,5,1]):
             # print('p1 = %d, p2 = %d' %(p1,p2))
             arr[ (p1//10) -4 ][ (p2//5) -5] = 1
 
-print(arr)
+# print(arr)
 
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
+container = []
+for index,elem in enumerate(res):
+    collected = 0
+    for index2,item in enumerate(container):
+        if(elem == item['ans']):
+            item['count'] += 1
+            collected = 1
+            break
+    if(not collected):
+        new_item = {'ans': elem,'count':1}
+        container.append(new_item)
 
+# print(res)
 
+# print(container)
+output = []
+max_count = 0
+for item in container:
+    if(item['count'] > max_count):
+        max_count = item['count']
+        output = item['ans']
+
+#返回众数
+return output
