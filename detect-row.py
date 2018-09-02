@@ -22,7 +22,7 @@ import json
 
 
 # tofix : 
-filename = './images/t8.jpg'
+filename = './images/ds5-1.jpeg'
 total_ques_num = 8
 total_opt_num = 5
 
@@ -77,7 +77,7 @@ def recognize(p1,p2):
         r = item[2] # radius
 
         info = {'x' : x, 'y' : y, 'radius' : r ,\
-             'ques' : 0 , 'option' : 0 , 'value' : 0}
+             'ques' : 0 , 'option' : 0 , 'value' : 0, 'white': 0}
         circle_info.append(info)
 
         # record possible circle's posY in the sheet
@@ -110,6 +110,13 @@ def recognize(p1,p2):
             posY_counter.remove(pos_record)
 
 
+    allR = 0
+    meanR = 0
+    for item in circle_info:
+        allR += item['radius']
+
+    meanR = int(np.ceil(allR / len(circle_info)))    
+
     ## sort in the order of question
     circle_info.sort(key=lambda d:d['y'])
 
@@ -128,7 +135,7 @@ def recognize(p1,p2):
     circle_info.sort(key=lambda d:d['x'])
 
     # categorize option num
-    for ques in range(1,total_ques_num+1):
+    for ques in range(1,len(posY_counter) +1 ):
         opt = 1
         for index,item in enumerate(circle_info):
             if(item['ques'] == ques):
@@ -144,7 +151,7 @@ def recognize(p1,p2):
     # start recognition
     # set boundaries of users' stroke-color
     boundaries = [([0], [50])]
-    border = 8
+    border = 0
 
     kernel = np.ones((3,3),np.uint8)
 
@@ -157,15 +164,20 @@ def recognize(p1,p2):
 
         try:    
             # crop circle to external square
-            rectX = (x - r)
-            rectY = (y - r)
+            rectX = (x - meanR)
+            rectY = (y - meanR)
 
-            crop_img = strengthen_img[rectY+border:(rectY+2*r)-border,\
-                        rectX+border:(rectX+2*r)-border]    
+            crop_img = strengthen_img[rectY:(rectY+2*meanR),\
+                        rectX:(rectX+2*meanR)]  
+
+            circle_mask = np.zeros((meanR*2,meanR*2),dtype=np.uint8)
+            cv2.circle(circle_mask,(meanR,meanR),meanR,(255,255,255),cv2.FILLED)     
+            crop_img = cv2.bitwise_and(crop_img,crop_img,mask=circle_mask)
             erosion = cv2.erode(crop_img,kernel,iterations = 1)    
-        except:
+        except Exception as e:
             # print('exit3')
             # exit()
+            print(e)
             return ans_list
 
         for (lower, upper) in boundaries:
@@ -178,23 +190,26 @@ def recognize(p1,p2):
                 for col in row:
                     if( col == 255):
                         item['value'] += 1
-
-        # cv2.imshow   ('detected circles {},{}'.format(item['ques'],item['option']),erosion) # removable
+                    else:
+                        item['white'] += 1
+                        
+        # cv2.imshow('detected circles {},{},{}.{}'.format(item['ques'],item['option'],p1,p2),erosion) # removable
  
     # judge answer
-    for ques_index in range(1,total_ques_num+1):
-        blackest = 0
+    for ques_index in range(1,len(posY_counter)+1):
+        black_rate = 0.0
         found = {} #
         for item in circle_info:
             if(item['ques'] == ques_index):
                 # print(item['value'])
-                if(item['value'] > blackest):
-                    blackest = item['value']
+                curr_rate = item['value'] / (item['white'] + item['value'])
+                if(curr_rate > black_rate):
+                    black_rate = curr_rate
                     found = item
         try:
             ans_list.append(found['option'])
-            # print('- - - %d - - - %d - - - %d - - - %d - - -' % (found['x'],found['y'],found['ques'],found['option'])) #
-            # cv2.circle(original_img,found['x'],found['y'],found['radius'],(0,0,255),2) # check if circles are correct (removable)
+            # print('- - - %d - - - %d - - - %d - - - %d - - - %d - - - ' % (found['x'],found['y'],found['radius'],found['ques'],found['option'])) #
+            # cv2.circle(original_img,(found['x'],found['y']),found['radius'],(0,0,255),2) # check if circles are correct (removable)
             # print("question",ques_index+1,":",ans)
         except:
             # print('exit4')
@@ -222,14 +237,17 @@ def recognize(p1,p2):
 
 
     # cv2.imshow('detected circles of {}-{}'.format(p1,p2),original_img)
-    
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
     return ans_list
 
 
+# # -----------------------------------------------------
+
 res = []
-arr = [[0 for i in range(1)] for j in range(4)]
-for p1 in range(40,80,10):
+arr = [[0 for i in range(1)] for j in range(5)]
+for p1 in range(40,110,10):
     # for p2 in range(25, 40, 5):
         p2 = 25
         curr_ans = recognize(p1,p2)
@@ -254,15 +272,14 @@ for index,elem in enumerate(res):
         new_item = {'ans': elem,'count':1}
         container.append(new_item)
 
-# print(res)
+print(res)
 
 # print(container)
 output = []
 max_count = 0
 for item in container:
-    if(item['count'] > max_count):
+    if(item['count'] > max_count and item['ans'] != []):
         max_count = item['count']
         output = item['ans']
 
-#返回众数
 return output
